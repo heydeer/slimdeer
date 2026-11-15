@@ -140,6 +140,9 @@ pub fn parse(args: impl Iterator<Item = String>) -> Result<Option<Command>, Stri
     if command.upscale.is_some() && command.output.is_none() {
         return Err("--upscale needs -o".into());
     }
+    if command.upscale == Some(0) {
+        return Err("--upscale: at least 1, not 0".into());
+    }
     if command.output.is_some() && command.dir.is_some() {
         return Err("-o and -d both say where to write; give one".into());
     }

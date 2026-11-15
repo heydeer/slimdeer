@@ -124,7 +124,14 @@ fn a_bad_file_doesnt_stop_the_others() {
 #[test]
 fn a_command_it_cant_run_exits_2() {
     let dir = folder("usage", &["a.png", "b.png"]);
-    for args in [&[][..], &["a.png", "b.png", "-o", "x.png"], &["--quality", "80", "a.png"], &["a.png", "--target", "101"], &["-", "--json"]] {
+    for args in [
+        &[][..],
+        &["a.png", "b.png", "-o", "x.png"],
+        &["--quality", "80", "a.png"],
+        &["a.png", "--target", "101"],
+        &["-", "--json"],
+        &["a.png", "-o", "x.png", "--upscale", "0"],
+    ] {
         let run = slimdeer(&dir, args);
         assert_eq!(run.status.code(), Some(2), "{args:?}");
         assert!(String::from_utf8_lossy(&run.stderr).contains("slimdeer --help"), "{args:?}");
