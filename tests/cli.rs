@@ -265,3 +265,19 @@ fn outputs_differing_in_case_dont_overwrite_each_other() {
     }
     fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn version_names_the_version_and_the_features_built_in() {
+    let dir = folder("version", &[]);
+    for flag in ["-V", "--version"] {
+        let run = slimdeer(&dir, &[flag]);
+        assert_eq!(run.status.code(), Some(0));
+        let said = String::from_utf8(run.stdout).unwrap();
+        assert!(said.starts_with(&format!("slimdeer {}", env!("CARGO_PKG_VERSION"))), "{said}");
+        // the test binary is built with this crate's default features
+        for feature in ["oxipng", "webp", "jpeg", "avif", "parallel"] {
+            assert!(said.contains(feature), "{said}");
+        }
+    }
+    fs::remove_dir_all(&dir).unwrap();
+}

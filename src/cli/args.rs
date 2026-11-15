@@ -34,7 +34,7 @@ Options:
   -v, --verbose        Say what each file came to, on stderr
       --json           Print each file's report, a JSON line, on stdout
   -h, --help           Print this help
-  -V, --version        Print the version
+  -V, --version        Print the version, and the optional features built in
 
 Also:
   slimdeer ORIGINAL --score OTHER    Print OTHER's SSIMULACRA2 score against ORIGINAL";
@@ -107,7 +107,7 @@ pub fn parse(args: impl Iterator<Item = String>) -> Result<Option<Command>, Stri
                 return Ok(None);
             }
             "-V" | "--version" => {
-                println!("slimdeer {}", env!("CARGO_PKG_VERSION"));
+                println!("slimdeer {}{}", env!("CARGO_PKG_VERSION"), built_features());
                 return Ok(None);
             }
             "--score" => command.score_against = Some(value()?),
@@ -169,4 +169,24 @@ pub fn parse(args: impl Iterator<Item = String>) -> Result<Option<Command>, Stri
 
 fn number<T: std::str::FromStr>(option: &str, value: String) -> Result<T, String> {
     value.parse().map_err(|_| format!("{option}: not a number: {value}"))
+}
+
+/// -V's parenthesis: the optional features this binary was built with, so "built without the X
+/// feature" (encode.rs) is easy to check without rebuilding.
+fn built_features() -> String {
+    let features: Vec<&str> = [
+        ("oxipng", cfg!(feature = "oxipng")),
+        ("webp", cfg!(feature = "webp")),
+        ("jpeg", cfg!(feature = "jpeg")),
+        ("avif", cfg!(feature = "avif")),
+        ("parallel", cfg!(feature = "parallel")),
+    ]
+    .into_iter()
+    .filter_map(|(name, on)| on.then_some(name))
+    .collect();
+    if features.is_empty() {
+        String::new()
+    } else {
+        format!(" ({})", features.join(", "))
+    }
 }
