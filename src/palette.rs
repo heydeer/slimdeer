@@ -473,10 +473,15 @@ fn build(pixels: &[RGBA], weights: Option<&[u8]>, colors: usize, rounds: usize) 
 /// color weighted by its pixel count times its distance to its entry to the power `power - 2`: 2 is
 /// plain k-means, 3 pulls entries toward the worst-served colors, which plain palettes leave a
 /// little further off than TinyPNG's (the same mean error, a larger 99th percentile; FINDINGS.md
-/// round 9), costing most where full dithering has to make up for it. Translucent entries are kept.
+/// round 9), costing most where full dithering has to make up for it. Translucent entries are kept,
+/// and a palette with no opaque entry comes back as it is.
 pub fn refine_palette(pixels: &[RGBA], palette: &[RGBA], iterations: usize, power: f64) -> Vec<RGBA> {
     let entries = entries(histogram(pixels, None).into_iter().filter(|(c, _)| c.a == 255).collect());
     let mut centers: Vec<Color> = palette.iter().filter(|c| c.a == 255).map(|&c| to_color(c)).collect();
+    if centers.is_empty() {
+        // nothing to refine: an image translucent nearly everywhere gets no opaque entry
+        return palette.to_vec();
+    }
     for _ in 0..iterations {
         let nearest = Nearest::new(&centers);
         let parts = par::chunked(&entries, |_, chunk| {
@@ -548,4 +553,21 @@ pub fn exact_palette(pixels: &[RGBA]) -> Option<(Vec<RGBA>, Vec<u8>)> {
         indices.push(k);
     }
     Some((palette, indices))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refining_needs_an_opaque_entry() {
+        // opaque pixels, but a palette whose entries are all translucent: nothing to refine
+        let pixels: Vec<RGBA> = (0..64).map(|i| RGBA::new(i * 4, 0, 128, if i < 8 { 255 } else { 200 })).collect();
+        let palette = [RGBA::new(0, 0, 128, 200), RGBA::new(250, 0, 128, 200), RGBA::new(0, 0, 0, 0)];
+        assert_eq!(refine_palette(&pixels, &palette, 5, 3.0), palette);
+        // with one, that entry moves to the opaque pixels, and the translucent one stays
+        let refined = refine_palette(&pixels, &[RGBA::new(200, 0, 128, 255), palette[0]], 5, 3.0);
+        assert_eq!(refined.len(), 2);
+        assert!(refined.contains(&palette[0]) && refined.iter().any(|c| c.a == 255 && c.r < 40), "{refined:?}");
+    }
 }

@@ -64,6 +64,21 @@ fn few_colors_stay_lossless() {
     assert_eq!(codec::decode(&out.png).unwrap().pixels, pixels);
 }
 
+#[test]
+fn misses_where_hardly_a_pixel_is_opaque() {
+    // one opaque column, then a fade to transparent: at 256 colors the plain palette has no opaque
+    // entry, and the refined extra (tried when the target is far out of reach) has nothing to move
+    let (w, h) = (160, 120);
+    let pixels: Vec<RGBA> = (0..w * h)
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            RGBA::new((x * 255 / w) as u8, (y * 255 / h) as u8, 128, if x == 0 { 255 } else { 254 - (x * 254 / w) as u8 })
+        })
+        .collect();
+    let out = compress(&codec::encode_rgba(&pixels, w, h), &Settings { target: Some(70.0), ..Default::default() }).unwrap();
+    assert!(out.report.miss && out.report.score < 70.0, "{}", out.report.score);
+}
+
 /// One PNG chunk: length, type, data and CRC.
 fn png_chunk(kind: &[u8; 4], data: &[u8]) -> Vec<u8> {
     let mut crc = crc32fast::Hasher::new();
