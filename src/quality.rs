@@ -1,5 +1,5 @@
-//! The lossy encoders' quality search (WebP's, JPEG's): the lowest quality (0–100) whose file scores
-//! at least the target, in rounds of ROUND files encoded at once.
+//! The lossy encoders' quality search (WebP's, JPEG's): the lowest quality (0–100, or from the
+//! encoder's lowest) whose file scores at least the target, in rounds of ROUND files encoded at once.
 
 use std::collections::BTreeMap;
 
@@ -10,6 +10,8 @@ const SPREAD: i32 = 4;
 
 /// A file the search tried.
 pub(crate) trait Tried {
+    /// The lowest quality its encoder takes.
+    const LOWEST: u32 = 0;
     fn quality(&self) -> u32;
     fn score(&self) -> f64;
     fn size(&self) -> usize;
@@ -63,8 +65,8 @@ pub(crate) fn search_spread<T: Tried, E>(
         let hi = tried.values().filter(|t| t.score() >= target).map(|t| t.quality()).min();
         let lo = tried.values().filter(|t| t.score() < target && hi.is_none_or(|h| t.quality() < h)).map(|t| t.quality()).max();
         let ends = |q: Option<u32>| q.map(|q| (q as i32, Some(tried[&q].score())));
-        let (lo, hi) = (ends(lo).unwrap_or((-1, None)), ends(hi).unwrap_or((101, None)));
-        if hi.0 - lo.0 <= 1 || (lo.0 >= 0 && tried[&(lo.0 as u32)].size() >= limit) {
+        let (lo, hi) = (ends(lo).unwrap_or((T::LOWEST as i32 - 1, None)), ends(hi).unwrap_or((101, None)));
+        if hi.0 - lo.0 <= 1 || (lo.1.is_some() && tried[&(lo.0 as u32)].size() >= limit) {
             break;
         }
         let qualities: Vec<u32> = round(lo, hi, target, estimate, slope, spread).into_iter().filter(|q| !tried.contains_key(q)).collect();
@@ -81,9 +83,10 @@ pub(crate) fn search_spread<T: Tried, E>(
 }
 
 /// A round's qualities, strictly between `lo` (falls short) and `hi` (reaches the target), each
-/// with its score (-1 and 101: none yet): all of them when ROUND or fewer are left; while one side
-/// is unknown, ROUND qualities `spread` apart around where the target should be (a `slope` step
-/// from the known side, or `estimate`); otherwise spread evenly between the two.
+/// with its score (one under the lowest quality and 101: none yet): all of them when ROUND or fewer
+/// are left; while one side is unknown, ROUND qualities `spread` apart around where the target
+/// should be (a `slope` step from the known side, or `estimate`); otherwise spread evenly between
+/// the two.
 fn round(lo: (i32, Option<f64>), hi: (i32, Option<f64>), target: f64, estimate: f64, slope: f64, spread: i32) -> Vec<u32> {
     let (n, span) = (ROUND as i32, (ROUND as i32 - 1) * spread);
     let evenly = || (1..=n).map(|i| (lo.0 + (hi.0 - lo.0) * i / (n + 1)) as u32).collect();

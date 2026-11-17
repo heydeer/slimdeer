@@ -88,6 +88,15 @@ fn never_bigger_than_the_input() {
 }
 
 #[test]
+fn a_flat_color_goes_down_to_the_lowest_quality() {
+    // nothing falls short on plain white, so the search ends at the bottom of mozjpeg's range: 1, not 0
+    let input = mozjpeg::encode(&[255; W * H * 3], W, H, 3, &mozjpeg::Options { quality: 80, ..Default::default() }, None, None).unwrap();
+    let out = compress_jpeg(&input, &Settings::default()).unwrap();
+    assert_eq!((out.outcome, out.quality), ("hit", Some(1)));
+    assert!(out.score >= out.target && out.jpeg.len() < input.len());
+}
+
+#[test]
 fn misses_by_the_least() {
     // 4:2:0 can't reach 99 on this image: the best-scoring file smaller than the input
     let input = mozjpeg::encode(&photo(), W, H, 3, &mozjpeg::Options { quality: 100, full_chroma: true, ..Default::default() }, None, None).unwrap();
