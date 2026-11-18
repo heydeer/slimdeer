@@ -131,6 +131,8 @@ struct Attempt {
 }
 
 impl Tried for Attempt {
+    /// mozjpeg's qualities start at 1.
+    const LOWEST: u32 = 1;
     fn quality(&self) -> u32 {
         self.quality
     }
